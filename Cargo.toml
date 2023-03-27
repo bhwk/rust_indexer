@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 open = "4"
+walkdir = "2"
+path-absolutize = "3"
