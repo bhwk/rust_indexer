@@ -1,22 +1,52 @@
 use std::collections::BTreeMap;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use walkdir::{DirEntry, WalkDir};
 
-fn build_index(dir_path: &Path) -> Result<BTreeMap<String, PathBuf>, io::Error> {
+fn build_index(dir_path: WalkDir) -> Result<BTreeMap<String, PathBuf>, io::Error> {
+    fn is_hidden(entry: &DirEntry) -> bool {
+        entry
+            .file_name()
+            .to_str()
+            .map(|s| s.starts_with("."))
+            .unwrap_or(false)
+    }
+
     let mut index: BTreeMap<String, PathBuf> = BTreeMap::new();
+    let mut entries = dir_path.into_iter();
 
-    for entry in dir_path.read_dir().expect("read dir failed") {
-        if let Ok(entry) = entry {
-            let file = entry
-                .path()
-                .file_stem()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_owned();
-            let path = entry.path().to_owned();
-            index.insert(file, path);
+    loop {
+        let entry = match entries.next() {
+            None => break,
+            Some(Err(err)) => panic!("ERROR: {}", err),
+            Some(Ok(entry)) => entry,
+        };
+
+        if entry.file_name() == "node_modules" {
+            entries.skip_current_dir();
+            continue;
         }
+
+        if is_hidden(&entry) {
+            if entry.file_type().is_dir() {
+                entries.skip_current_dir();
+            }
+            continue;
+        }
+
+        let path = entry.path().to_owned();
+        let file = entry
+            .path()
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+
+        println!("indexing: {:?}", &path);
+        index.insert(file, path);
+
+        println!("{}", entry.path().display());
     }
 
     Ok(index)
@@ -27,11 +57,13 @@ fn open_file(buffer: &String, index: &BTreeMap<String, PathBuf>) {
     let filepath = index.get(&buffer);
 
     match filepath {
-        Some(path) => {
-            open::commands(path)[0]
-                .spawn()
-                .expect("should open application");
-        }
+        Some(path) => match open::commands(path)[0].spawn() {
+            Ok(child) => {
+                println!("Opened {:?}", path)
+            }
+
+            Err(err) => eprint!("Error: {:?}", err),
+        },
         None => {
             for (filename, path) in index
                 .range(buffer.to_owned()..)
@@ -44,17 +76,19 @@ fn open_file(buffer: &String, index: &BTreeMap<String, PathBuf>) {
 }
 
 fn main() -> io::Result<()> {
-    let dir_path = Path::new("test");
+    let dir_path = WalkDir::new("/root");
     let build = build_index(dir_path);
     let index = match build {
-        Ok(map) => map,
+        Ok(build) => build,
         Err(error) => {
             println!("error: {:?}", error);
             panic!()
         }
     };
 
-    println!("{:?}", index);
+    for key in &index {
+        println!("{:?}", key);
+    }
 
     let mut buffer = String::new();
     match io::stdin().read_line(&mut buffer) {
