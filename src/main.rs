@@ -58,7 +58,7 @@ fn build_index(dir_path: WalkDir) -> Result<()> {
 }
 
 fn open_file(buffer: String, index: &Index) {
-    for (path, filename) in index.into_iter().filter(|(k, _)| k.contains(&buffer)) {
+    for (path, filename) in index.into_iter().filter(|(_, v)| v.contains(&buffer)) {
         println!("Found: {:?} at {:?}", filename, path)
     }
 }
