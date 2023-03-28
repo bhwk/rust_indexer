@@ -1,9 +1,12 @@
+use serde_json::Result;
 use std::collections::BTreeMap;
+use std::fs::File;
 use std::io;
-use std::path::PathBuf;
 use walkdir::{DirEntry, WalkDir};
 
-fn build_index(dir_path: WalkDir) -> Result<BTreeMap<String, PathBuf>, io::Error> {
+type Index = BTreeMap<String, String>;
+
+fn build_index(dir_path: WalkDir) -> Result<()> {
     fn is_hidden(entry: &DirEntry) -> bool {
         entry
             .file_name()
@@ -12,7 +15,7 @@ fn build_index(dir_path: WalkDir) -> Result<BTreeMap<String, PathBuf>, io::Error
             .unwrap_or(false)
     }
 
-    let mut index: BTreeMap<String, PathBuf> = BTreeMap::new();
+    let mut index = Index::new();
     let mut entries = dir_path.into_iter();
 
     loop {
@@ -34,7 +37,7 @@ fn build_index(dir_path: WalkDir) -> Result<BTreeMap<String, PathBuf>, io::Error
             continue;
         }
 
-        let path = entry.path().to_owned();
+        let path = entry.path().display().to_string();
         let file = entry
             .path()
             .file_stem()
@@ -44,52 +47,26 @@ fn build_index(dir_path: WalkDir) -> Result<BTreeMap<String, PathBuf>, io::Error
             .to_owned();
 
         println!("indexing: {:?}", &path);
-        index.insert(file, path);
+        index.insert(path, file);
 
-        println!("{}", entry.path().display());
+        let index_path = "index.json";
+        let index_file = File::create(index_path).unwrap();
+        serde_json::to_writer_pretty(index_file, &index)?;
     }
 
-    Ok(index)
+    Ok(())
 }
 
-fn open_file(buffer: &String, index: &BTreeMap<String, PathBuf>) {
-    let buffer = String::from(buffer);
-    let filepath = index.get(&buffer);
-
-    match filepath {
-        Some(path) => match open::commands(path)[0].spawn() {
-            Ok(child) => {
-                println!("Opened {:?}", path)
-            }
-
-            Err(err) => eprint!("Error: {:?}", err),
-        },
-        None => {
-            for (filename, path) in index
-                .range(buffer.to_owned()..)
-                .take_while(|(k, _)| k.contains(&buffer))
-            {
-                println!("Found: {:?}: {:?}", filename, path)
-            }
-        }
+fn open_file(buffer: String, index: &Index) {
+    for (path, filename) in index.into_iter().filter(|(k, _)| k.contains(&buffer)) {
+        println!("Found: {:?} at {:?}", filename, path)
     }
 }
 
 fn main() -> io::Result<()> {
-    let dir_path = WalkDir::new("/root");
-    let build = build_index(dir_path);
-    let index = match build {
-        Ok(build) => build,
-        Err(error) => {
-            println!("error: {:?}", error);
-            panic!()
-        }
-    };
-
-    for key in &index {
-        println!("{:?}", key);
-    }
-
+    let index_path = "index.json";
+    let index_file = File::open(index_path)?;
+    let index: Index = serde_json::from_reader(index_file).expect("Should be able to read content");
     let mut buffer = String::new();
     match io::stdin().read_line(&mut buffer) {
         Ok(_) => {
@@ -100,8 +77,7 @@ fn main() -> io::Result<()> {
             println!("error: {:?}", error);
         }
     }
-
-    open_file(&buffer, &index);
+    open_file(buffer, &index);
 
     Ok(())
 }
