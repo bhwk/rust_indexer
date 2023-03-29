@@ -1,12 +1,26 @@
-use serde_json::Result;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io;
 use walkdir::{DirEntry, WalkDir};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
+impl serde::Serialize for Error {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.to_string().as_ref())
+    }
+}
 
 type Index = BTreeMap<String, String>;
 
-fn build_index(dir_path: WalkDir) -> Result<()> {
+pub fn build_index(dir_path: &str) {
+    let dir_path = WalkDir::new(dir_path);
     fn is_hidden(entry: &DirEntry) -> bool {
         entry
             .file_name()
@@ -51,33 +65,18 @@ fn build_index(dir_path: WalkDir) -> Result<()> {
 
         let index_path = "index.json";
         let index_file = File::create(index_path).unwrap();
-        serde_json::to_writer_pretty(index_file, &index)?;
+        serde_json::to_writer_pretty(index_file, &index).unwrap();
     }
-
-    Ok(())
+    println!("Indexing complete");
 }
 
-fn open_file(buffer: String, index: &Index) {
-    for (path, filename) in index.into_iter().filter(|(_, v)| v.contains(&buffer)) {
-        println!("Found: {:?} at {:?}", filename, path)
-    }
-}
-
-fn main() -> io::Result<()> {
-    let index_path = "index.json";
-    let index_file = File::open(index_path)?;
+pub fn search_files(buffer: String) -> Result<HashMap<String, String>, Error> {
+    let index_file = File::open("index.json")?;
     let index: Index = serde_json::from_reader(index_file).expect("Should be able to read content");
-    let mut buffer = String::new();
-    match io::stdin().read_line(&mut buffer) {
-        Ok(_) => {
-            buffer.pop();
-        }
-
-        Err(error) => {
-            println!("error: {:?}", error);
-        }
+    let mut search_results = HashMap::<String, String>::new();
+    for (path, filename) in index.into_iter().filter(|(_, v)| v.contains(&buffer)) {
+        println!("Found: {:?} at {:?}", filename, path);
+        search_results.insert(path, filename);
     }
-    open_file(buffer, &index);
-
-    Ok(())
+    Ok(search_results)
 }
