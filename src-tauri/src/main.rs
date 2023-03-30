@@ -20,9 +20,14 @@ async fn search_files(term: String) -> Result<HashMap<String, String>, search::E
     search::search_files(term)
 }
 
+#[tauri::command]
+async fn open_file(path: String) -> Result<(), search::Error> {
+    search::open_file(path)
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(generate_handler![search_files, build_index])
+        .invoke_handler(generate_handler![search_files, build_index, open_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

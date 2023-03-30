@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
+use std::path::Path;
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(Debug, thiserror::Error)]
@@ -79,4 +80,17 @@ pub fn search_files(buffer: String) -> Result<HashMap<String, String>, Error> {
         search_results.insert(path, filename);
     }
     Ok(search_results)
+}
+
+pub fn open_file(path: String) -> Result<(), Error> {
+    let path = Path::new(&path);
+
+    match open::commands(path)[0].spawn() {
+        Ok(_) => {
+            println!("Opened {}", path.display());
+        }
+        Err(err) => return Err(Error::Io(err)),
+    }
+
+    Ok(())
 }
