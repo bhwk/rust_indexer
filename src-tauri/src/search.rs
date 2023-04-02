@@ -20,8 +20,7 @@ impl serde::Serialize for Error {
 
 type Index = BTreeMap<String, String>;
 
-pub fn build_index(dir_path: &str) {
-    let dir_path = WalkDir::new(dir_path);
+pub fn build_index(dir_path: Vec<&str>) {
     fn is_hidden(entry: &DirEntry) -> bool {
         entry
             .file_name()
@@ -31,43 +30,49 @@ pub fn build_index(dir_path: &str) {
     }
 
     let mut index = Index::new();
-    let mut entries = dir_path.into_iter();
+    for filepath in dir_path {
+        let filepath = WalkDir::new(filepath);
 
-    loop {
-        let entry = match entries.next() {
-            None => break,
-            Some(Err(err)) => panic!("ERROR: {}", err),
-            Some(Ok(entry)) => entry,
-        };
+        let mut entries = filepath.into_iter();
 
-        if entry.file_name() == "node_modules" {
-            entries.skip_current_dir();
-            continue;
-        }
+        loop {
+            let entry = match entries.next() {
+                None => break,
+                Some(Err(err)) => {
+                    println!("ERROR: {}", err);
+                    continue;
+                }
+                Some(Ok(entry)) => entry,
+            };
 
-        if is_hidden(&entry) {
-            if entry.file_type().is_dir() {
+            if entry.file_name() == "node_modules" {
                 entries.skip_current_dir();
+                continue;
             }
-            continue;
+
+            if is_hidden(&entry) {
+                if entry.file_type().is_dir() {
+                    entries.skip_current_dir();
+                }
+                continue;
+            }
+
+            let path = entry.path().display().to_string();
+            let file = entry
+                .path()
+                .file_stem()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_owned();
+
+            println!("indexing: {:?}", &path);
+            index.insert(path, file);
         }
-
-        let path = entry.path().display().to_string();
-        let file = entry
-            .path()
-            .file_stem()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned();
-
-        println!("indexing: {:?}", &path);
-        index.insert(path, file);
-
-        let index_path = "index.json";
-        let index_file = File::create(index_path).unwrap();
-        serde_json::to_writer_pretty(index_file, &index).unwrap();
     }
+    let index_path = "index.json";
+    let index_file = File::create(index_path).unwrap();
+    serde_json::to_writer_pretty(index_file, &index).unwrap();
     println!("Indexing complete");
 }
 

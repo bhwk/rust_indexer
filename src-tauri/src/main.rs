@@ -10,7 +10,7 @@ use tauri::generate_handler;
 mod search;
 
 #[tauri::command]
-async fn build_index(dir_path: &str) -> Result<(),()> {
+async fn build_index(dir_path: Vec<&str>) -> Result<(),()> {
     search::build_index(dir_path);
     Ok(())
 }
