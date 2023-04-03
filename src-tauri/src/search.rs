@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(Debug, thiserror::Error)]
@@ -20,7 +20,7 @@ impl serde::Serialize for Error {
 
 type Index = BTreeMap<String, String>;
 
-pub fn build_index(dir_path: Vec<&str>) {
+pub fn build_index(dir_path: Vec<&str>, app_data_dir: PathBuf) {
     fn is_hidden(entry: &DirEntry) -> bool {
         entry
             .file_name()
@@ -70,14 +70,16 @@ pub fn build_index(dir_path: Vec<&str>) {
             index.insert(path, file);
         }
     }
-    let index_path = "index.json";
-    let index_file = File::create(index_path).unwrap();
+    let index_file = File::create(app_data_dir.as_path()).unwrap();
     serde_json::to_writer_pretty(index_file, &index).unwrap();
     println!("Indexing complete");
 }
 
-pub fn search_files(buffer: String) -> Result<HashMap<String, String>, Error> {
-    let index_file = File::open("index.json")?;
+pub fn search_files(
+    buffer: String,
+    app_data_dir: PathBuf,
+) -> Result<HashMap<String, String>, Error> {
+    let index_file = File::open(app_data_dir.as_path()).unwrap();
     let index: Index = serde_json::from_reader(index_file).expect("Should be able to read content");
     let mut search_results = HashMap::<String, String>::new();
     for (path, filename) in index.into_iter().filter(|(_, v)| v.contains(&buffer)) {

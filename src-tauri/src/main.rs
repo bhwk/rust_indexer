@@ -9,15 +9,20 @@ use tauri::generate_handler;
 
 mod search;
 
+
 #[tauri::command]
-async fn build_index(dir_path: Vec<&str>) -> Result<(),()> {
-    search::build_index(dir_path);
+async fn build_index(dir_path: Vec<&str>, app_handle: tauri::AppHandle) -> Result<(),()> {
+    let mut app_data_dir = app_handle.path_resolver().app_data_dir().expect("failed to get data_dir");
+    app_data_dir.push("index.json");
+    search::build_index(dir_path, app_data_dir);
     Ok(())
 }
 
 #[tauri::command]
-async fn search_files(term: String) -> Result<HashMap<String, String>, search::Error> {
-    search::search_files(term)
+async fn search_files(term: String, app_handle: tauri::AppHandle) -> Result<HashMap<String, String>, search::Error> {
+    let mut app_data_dir = app_handle.path_resolver().app_data_dir().expect("failed to get data_dir");
+    app_data_dir.push("index.json");
+    search::search_files(term, app_data_dir)
 }
 
 #[tauri::command]
