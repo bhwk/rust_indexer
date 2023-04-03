@@ -4,17 +4,17 @@
 )]
 
 use std::collections::HashMap;
-
 use tauri::generate_handler;
 
 mod search;
 
 
 #[tauri::command]
-async fn build_index(dir_path: Vec<&str>, app_handle: tauri::AppHandle) -> Result<(),()> {
-    let mut app_data_dir = app_handle.path_resolver().app_data_dir().expect("failed to get data_dir");
-    app_data_dir.push("index.json");
-    search::build_index(dir_path, app_data_dir);
+async fn build_index(app_handle: tauri::AppHandle) -> Result<(),()> {
+    let app_data_dir = app_handle.path_resolver().app_data_dir().expect("failed to get data_dir");
+    let index_path = app_data_dir.join("index.json");
+    let config_path = app_data_dir.join("config.json");
+    search::build_index(index_path, config_path);
     Ok(())
 }
 

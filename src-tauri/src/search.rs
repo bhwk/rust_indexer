@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -7,6 +8,11 @@ use walkdir::{DirEntry, WalkDir};
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Config {
+    directories: Vec<String>,
 }
 
 impl serde::Serialize for Error {
@@ -20,7 +26,7 @@ impl serde::Serialize for Error {
 
 type Index = BTreeMap<String, String>;
 
-pub fn build_index(dir_path: Vec<&str>, app_data_dir: PathBuf) {
+pub fn build_index(index_path: PathBuf, config_path: PathBuf) {
     fn is_hidden(entry: &DirEntry) -> bool {
         entry
             .file_name()
@@ -29,11 +35,15 @@ pub fn build_index(dir_path: Vec<&str>, app_data_dir: PathBuf) {
             .unwrap_or(false)
     }
 
-    let mut index = Index::new();
-    for filepath in dir_path {
-        let filepath = WalkDir::new(filepath);
+    let config_file =
+        File::open(config_path.as_path()).expect("failed to open file/file doesn't exist");
+    let config: Config = serde_json::from_reader(config_file).expect("failed to read contents");
 
-        let mut entries = filepath.into_iter();
+    let mut index = Index::new();
+    for dir in config.directories {
+        let dir_path = WalkDir::new(dir);
+
+        let mut entries = dir_path.into_iter();
 
         loop {
             let entry = match entries.next() {
@@ -70,7 +80,7 @@ pub fn build_index(dir_path: Vec<&str>, app_data_dir: PathBuf) {
             index.insert(path, file);
         }
     }
-    let index_file = File::create(app_data_dir.as_path()).unwrap();
+    let index_file = File::create(index_path.as_path()).unwrap();
     serde_json::to_writer_pretty(index_file, &index).unwrap();
     println!("Indexing complete");
 }
