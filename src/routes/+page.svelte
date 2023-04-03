@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { invoke } from '@tauri-apps/api';
+	import { appDataDir } from '@tauri-apps/api/path';
 
-	let dirPath = '/root';
+	let dirPath: string[] = ['/root/sideprojects/rust_indexer/src/'];
 	let term: string;
 	let searchResults: any;
 
@@ -32,6 +33,12 @@
 	}
 </script>
 
+<button
+	on:click={async () => {
+		let dataDir = await appDataDir();
+		open_file(dataDir);
+	}}>open data dir</button
+>
 <button on:click={build_index}>Build index</button>
 <button
 	on:click={async () => {
