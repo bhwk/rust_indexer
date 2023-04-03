@@ -2,7 +2,6 @@
 	import { invoke } from '@tauri-apps/api';
 	import { appDataDir } from '@tauri-apps/api/path';
 
-	let dirPath: string[] = ['/root/sideprojects/rust_indexer/src/'];
 	let term: string;
 	let searchResults: any;
 
@@ -11,7 +10,7 @@
 	}
 
 	async function build_index() {
-		await invoke('build_index', { dirPath }).then(() => console.log('Indexing complete'));
+		await invoke('build_index').then(() => console.log('Indexing complete'));
 	}
 
 	async function open_file(path: string) {
@@ -40,12 +39,15 @@
 	}}>open data dir</button
 >
 <button on:click={build_index}>Build index</button>
-<button
-	on:click={async () => {
-		searchResults = await search_files(term);
-	}}>Search</button
->
-<input bind:value={term} />
+
+<input
+	bind:value={term}
+	on:keydown={async (keypress) => {
+		if (keypress.key == 'Enter') {
+			searchResults = await search_files(term);
+		}
+	}}
+/>
 {#if searchResults}
 	{#each Object.entries(searchResults) as [path, filename]}
 		<div>
